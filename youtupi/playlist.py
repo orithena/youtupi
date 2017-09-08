@@ -15,7 +15,8 @@ mpd_port = None
 def initMPD(host, port):
     global mpd_host, mpd_port, mpd_old_status
     mpd_old_status = None
-    mpd_host, mpd_port = host, port;
+    mpd_host, mpd_port = host, port
+    print "mpd will be looked for at %s:%s" % (mpd_host, mpd_port)
 
 def afterPlay():
     # is being called after playlist is done
@@ -25,6 +26,7 @@ def afterPlay():
             mpc.connect(mpd_host, mpd_port)
             status = mpc.status()['state']
             if status == 'pause':
+                print "mpd status is %s, mpd old status was %s, now playing again" % (status, mpd_old_status)
                 mpc.play()
                 mpd_old_status = None
             mpc.disconnect()
@@ -39,6 +41,7 @@ def beforePlay():
             mpc.connect(mpd_host, mpd_port)
             status = mpc.status()['state']
             if status == 'play':
+                print "mpd status is %s, mpd old status was %s, now pausing" % (status, mpd_old_status)
                 mpc.pause()
                 mpd_old_status = status
             mpc.disconnect()
@@ -169,4 +172,5 @@ def autoPlay():
             prepareVideo(nvideo)
     threading.Timer(1, autoPlay).start()
 
+initMPD("localhost", 6600)
 autoPlay()
