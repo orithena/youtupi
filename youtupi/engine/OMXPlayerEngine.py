@@ -1,6 +1,5 @@
 from youtupi.engine.PlaybackEngine import PlaybackEngine
 import os, signal, subprocess, dbus, time, textwrap, codecs, getpass
-
 from betterprint import pprint
 
 SECONDS_FACTOR = 1000000
@@ -11,21 +10,22 @@ TITLE_DISPLAY_SRT = "/run/shm/youtupi.srt"
 @author: Max
 '''
 class OMXPlayerEngine(PlaybackEngine):
-    
+
     '''
     OMXPlayer playback engine using DBUS interface
     '''
 
     def __init__(self):
-        self.baseVolume = -1800
+        pass
 
     player = None
-    
+    baseVolume = 0
+
     def subtitleBlock(self, id, text):
         id = max(id, 1)
         r = "\n%d\n00:00:%02d,000 --> 00:00:%02d,000\n%s\n" % (id, (id-1)*5, id*5, "\n".join(textwrap.wrap(text, 42)[:3]))
         return r
-    
+
     def prepareSubtitles(self, fname, video):
         try:
             id = 1
@@ -36,22 +36,23 @@ class OMXPlayerEngine(PlaybackEngine):
                 if 'description' in video.data:
                     f.write(self.subtitleBlock(id, video.data['description']))
                     id += 1
-        except Exception as e: 
+        except Exception as e:
             pprint(e)
-        
+
     def play(self, video):
         if not video.url:
             raise RuntimeError("Video URL not found")
         if self.isPlaying():
             self.stop()
-        playerArgs = ["omxplayer", "-b", "-o", "both", "--vol", "%d" % self.baseVolume ]
+        volume = self.baseVolume * 100 # OMXPlayer requires factor 100 to dB input
+        playerArgs = ["omxplayer", "-b", "-o", "both", "--vol", "%d" % volume ]
         if video.data:
             self.prepareSubtitles(TITLE_DISPLAY_SRT, video)
             playerArgs.extend(("--subtitles", TITLE_DISPLAY_SRT))
         playerArgs.append(video.url)
         print "Running player: " + " ".join(playerArgs)
         self.player = subprocess.Popen(playerArgs, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE, preexec_fn=os.setsid)
-        
+
     def stop(self):
         if self.isProcessRunning():
             try:
@@ -60,17 +61,17 @@ class OMXPlayerEngine(PlaybackEngine):
 		print "Failed sending stop signal"
                 os.killpg(self.player.pid, signal.SIGTERM)
         self.player = None
-    
+
     def togglePause(self):
         self.tryToSendAction(dbus.Int32("16"))
-    
+
     def setPosition(self, seconds):
         if self.isPlaying():
             try:
                 self.controller().SetPosition(dbus.ObjectPath("/not/used"), dbus.Int64(seconds*SECONDS_FACTOR))
             except:
                 print 'Unable to set position'
-    
+
     def getPosition(self):
         if self.isProcessRunning():
             try:
@@ -79,7 +80,7 @@ class OMXPlayerEngine(PlaybackEngine):
                 print 'Unable to determine position'
                 return 0
         return None
-    
+
     def getDuration(self):
         if self.isProcessRunning():
             try:
@@ -89,33 +90,35 @@ class OMXPlayerEngine(PlaybackEngine):
         return None
 
     def setBaseVolume(self, vol):
-        # OMXPlayer requires factor 100 to dB input
-        self.baseVolume = vol * 100
-    
+        self.baseVolume = vol
+
+    def getBaseVolume(self):
+        return self.baseVolume
+
     def volumeUp(self):
         self.tryToSendAction(dbus.Int32("18"))
-    
+
     def volumeDown(self):
         self.tryToSendAction(dbus.Int32("17"))
-    
+
     def seekBackSmall(self):
         self.tryToSendAction(dbus.Int32("19"))
-    
+
     def seekForwardSmall(self):
         self.tryToSendAction(dbus.Int32("20"))
-    
+
     def seekBackLarge(self):
         self.tryToSendAction(dbus.Int32("21"))
-    
+
     def seekForwardLarge(self):
         self.tryToSendAction(dbus.Int32("22"))
-    
+
     def prevAudioTrack(self):
         self.tryToSendAction(dbus.Int32("6"))
-    
+
     def nextAudioTrack(self):
         self.tryToSendAction(dbus.Int32("7"))
-    
+
     def isPlaying(self):
         if self.isProcessRunning():
             pos = self.getPosition()
@@ -129,14 +132,14 @@ class OMXPlayerEngine(PlaybackEngine):
             else:
                 return True
         return False
-    
+
     def tryToSendAction(self, action):
         if self.isProcessRunning():
             try:
                 self.controller().Action(action)
             except:
                 print 'Error connecting with player'
-    
+
     def controller(self):
         retry=0
         while True:
@@ -151,7 +154,7 @@ class OMXPlayerEngine(PlaybackEngine):
                 retry+=1
                 if retry >= DBUS_RETRY_LIMIT:
                     raise RuntimeError('Error loading player dbus interface')
-    
+
     def props(self):
         retry=0
         while True:
@@ -166,8 +169,8 @@ class OMXPlayerEngine(PlaybackEngine):
                 retry+=1
                 if retry >= DBUS_RETRY_LIMIT:
                     raise RuntimeError('Error loading player dbus interface')
-    
-            
+
+
     def isProcessRunning(self):
         if self.player:
             if self.player.poll() == None:

@@ -4,7 +4,8 @@ from StringIO import StringIO
 from os.path import expanduser
 from pafy import pafy
 from youtupi.video import Video
-from youtupi.util import config, downloader, ensure_dir
+from youtupi.util import config, downloader
+from youtupi.util.ensure_dir import  ensure_dir
 
 infoLock = threading.RLock()
 
@@ -18,7 +19,6 @@ def getUrl(data):
                                         return data['url']
                                 else:
                                         video = pafy.new(data['id'])
-                                        data.update(video._ydl_info)
                                 if data['format'] == "audio":
                                         bestaudio = video.getbestaudio(preftype="m4a")
                                         return bestaudio.url
@@ -38,7 +38,7 @@ def getUrl(data):
                                 data['description'] = e.message.split(':')[-1:]
                                 return "error"
                 return None
-	
+
 def resolveYoutubePlaylist(data):
         with infoLock:
                 if data['type'] == "youtube":
@@ -52,8 +52,8 @@ def resolveYoutubePlaylist(data):
                                         yield data
                         except Exception as e:
                                 print "Error fetching youtube playlist ", e
-                
-	
+
+
 def updateVideoData(data):
         with infoLock:
                 if(data['type'] == "youtube"):
@@ -85,7 +85,7 @@ def updateVideoData(data):
                 return data
 
 class youtube_dl:
-    
+
     def POST(self):
 		data = json.load(StringIO(web.data()))
 		video = pafy.new(data['id'])
